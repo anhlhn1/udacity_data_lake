@@ -3,8 +3,9 @@ from datetime import datetime
 import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf, col
-from pyspark.sql.functions import year, month, dayofmonth, hour, weekofyear, date_format
-
+from pyspark.sql.functions import year, month, dayofmonth, hour, weekofyear, dayofweek, date_format
+from pyspark.sql.types import *
+import pyspark.sql.types as T
 
 config = configparser.ConfigParser()
 config.read('dl.cfg')
