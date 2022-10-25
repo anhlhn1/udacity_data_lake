@@ -15,6 +15,9 @@ os.environ['AWS_SECRET_ACCESS_KEY']=config['AWS_SECRET_ACCESS_KEY']
 
 
 def create_spark_session():
+    '''
+    This function is used to initialize SparkSession that will be used for the rest of application
+    '''
     spark = SparkSession \
         .builder \
         .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:2.7.0") \
@@ -23,6 +26,16 @@ def create_spark_session():
 
 
 def process_song_data(spark, input_data, output_data):
+    '''
+    This function is used to load all raw data from the bucket input data in S3
+    then transform to get song_table + artist_table
+    Finally, we will write song_table + artist_table in partition to store in S3 again.
+    By this way, we are constructing S3 as a Data Lake, which stores both raw and cleansed data
+    Parameters:
+    - spark: SparkSession
+    - input_data: the S3 input path where has raw data
+    - output_data: the S3 output path where you store your transformed tables 
+    '''
     # get filepath to song data file
     song_data = input_data + '/song_data/*/*/*/*'
     
@@ -30,19 +43,29 @@ def process_song_data(spark, input_data, output_data):
     df = spark.read.json(song_data)
 
     # extract columns to create songs table
-    songs_table = df.select("song_id", "artist_id", "title", "year", "duration")
+    songs_table = df.select("song_id", "artist_id", "title", "year", "duration").dropDuplicates()
 
     # write songs table to parquet files partitioned by year and artist
     songs_table.write.partitionBy("year", "artist_id").mode("overwrite").save(output_data + "/song_data/song_table.parquet")
 
     # extract columns to create artists table
-    artists_table = df.select("artist_id", "artist_latitude", "artist_location", "artist_longitude", "artist_name") 
+    artists_table = df.select("artist_id", "artist_latitude", "artist_location", "artist_longitude", "artist_name").dropDuplicates()
     
     # write artists table to parquet files
     artists_table.write.mode("overwrite").save(output_data + "/artist_data/artist_table.parquet")
 
 
 def process_log_data(spark, input_data, output_data):
+    '''
+    This function is used to load all raw data from the bucket input data in S3
+    then transform to get user_tables + time_table + songplays_table 
+    Finally, we will write transformed tables in partition to store in S3 again.
+    By this way, we are constructing S3 as a Data Lake, which stores both raw and cleansed data
+    Parameters:
+    - spark: SparkSession
+    - input_data: the S3 input path where has raw data
+    - output_data: the S3 output path where you store your transformed tables 
+    '''
     # get filepath to log data file
     log_data = input_data + '/log_data/*/*/*'
 
@@ -73,7 +96,7 @@ def process_log_data(spark, input_data, output_data):
     df = df.filter(df.page == "NextSong")
     
     # extract columns for users table    
-    users_table = df.select("userId", "firstName", "lastName", "gender", "level") 
+    users_table = df.select("userId", "firstName", "lastName", "gender", "level").dropDuplicates()
     
     # write users table to parquet files
     users_table.write.mode("overwrite").parquet(output_data + "/user_data/user_table.parquet")
@@ -89,7 +112,7 @@ def process_log_data(spark, input_data, output_data):
                            weekofyear("start_time").alias('week'), \
                            month("start_time").alias('month'), \
                            year("start_time").alias('year'), \
-                           dayofweek("start_time").alias('weekday')
+                           dayofweek("start_time").alias('weekday').dropDuplicates()
     )
 
     # write time table to parquet files partitioned by year and month
@@ -108,7 +131,7 @@ def process_log_data(spark, input_data, output_data):
                                              year("start_time").alias('year'), \
                                              month("start_time").alias('month'), \
                                              "userId", "level", "song_id", \
-                                            "artist_id", "sessionId", "location", "userAgent")
+                                            "artist_id", "sessionId", "location", "userAgent").dropDuplicates()
 
     # write songplays table to parquet files partitioned by year and month
     songplays_table.write.partitionBy("year", "month").mode("overwrite")\
